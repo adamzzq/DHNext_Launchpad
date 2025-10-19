@@ -214,7 +214,7 @@ The AI will automatically categorize and extract status information.
 
 ## 📄 License
 
-This project is part of the DubHacks 2024 hackathon submission.
+This project is part of the DubHacks 2025 hackathon submission.
 
 ## 👥 Authors
 
@@ -224,7 +224,7 @@ This project is part of the DubHacks 2024 hackathon submission.
 
 - Atlassian Forge platform and documentation
 - Google Gemini AI for intelligent document parsing
-- DubHacks 2024 for the opportunity
+- DubHacks 2025 for the opportunity
 
 ## 📞 Support
 
@@ -234,4 +234,4 @@ For issues or questions:
 
 ---
 
-Built with ❤️ for DubHacks 2024
+Built with ❤️ for DubHacks 2025
