@@ -1,0 +1,24 @@
+modules:
+  jira:globalPage:
+    - key: dhnext-launchpad-page
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: DHNext Launchpad
+      route: dhnext-launchpad
+  function:
+    - key: resolver
+      handler: resolvers/index.handler
+resources:
+  - key: main
+    path: src/App.jsx
+app:
+  runtime:
+    name: nodejs22.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/157874ce-5f06-4dd1-b82d-bc77aadf1867
+permissions:
+  scopes:
+    - storage:app
