@@ -4,6 +4,10 @@
 
 DHNext Launchpad is an Atlassian Forge app that provides startup teams with essential tools to manage legal compliance, customer validation, and impact metrics directly within their Jira workspace.
 
+## Demo Site
+[App](https://dubhacks.atlassian.net/jira/apps/157874ce-5f06-4dd1-b82d-bc77aadf1867/73b942a9-b71d-4f3d-880e-80606245276f)
+
+[Sample Document](https://dubhacks.atlassian.net/wiki/spaces/~7120200a30f7e078a844609ce24f79837175a7/pages/14057622/Legal+Compliance+Checklist)
 ## ✨ Features
 
 ### 🔍 Legal & Compliance Checker
