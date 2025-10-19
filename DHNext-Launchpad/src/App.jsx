@@ -220,8 +220,8 @@ const App = () => {
                 {/* Header */}
                 <Box xcss={xcss({ paddingBottom: 'space.200', borderBottom: '2px solid', borderColor: 'color.border' })}>
                     <Stack space="space.100">
-                        <Heading size="large">🚀 DHNext Launchpad</Heading>
-                        <Text>Your all-in-one startup launch toolkit</Text>
+                        <Heading size="large">🚀 Your all-in-one startup launch toolkit</Heading>
+                        <Text>Streamline compliance, validate customers, and track key metrics—all in one place</Text>
                     </Stack>
                 </Box>
                 
