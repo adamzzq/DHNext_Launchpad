@@ -1,6 +1,8 @@
 import Resolver from '@forge/resolver';
-import { storage } from '@forge/api';
+import { storage, fetch } from '@forge/api';
 import api, { route } from '@forge/api';
+
+const GEMINI_API_KEY = 'AIzaSyDbCxZypUUD2jVs6q-7t0JFVNB3xYmAtZY';
 
 const resolver = new Resolver();
 
@@ -46,12 +48,9 @@ resolver.define('runComplianceCheck', async ({ payload }) => {
         console.log('Page content (first 500 chars):', pageContent.substring(0, 500));
         console.log('Page content length:', pageContent.length);
         
-        // Parse the HTML content to extract compliance items
-        // Look for patterns like:
-        // - "Terms of Service: COMPLETE" or "✅ Terms of Service"
-        // - "[x] Privacy Policy" or "☑ Privacy Policy"
-        const items = extractComplianceItems(pageContent);
-        console.log('Extracted items:', items);
+        // Use OpenAI to analyze the compliance document
+        const items = await analyzeWithGemini(pageContent);
+        console.log('AI extracted items:', items);
         
         const result = {
             status: 'success',
@@ -75,103 +74,98 @@ resolver.define('runComplianceCheck', async ({ payload }) => {
     }
 });
 
-// Helper function to extract compliance items from HTML content
-function extractComplianceItems(htmlContent) {
-    const items = [];
-    
-    // Extract content from CDATA sections if present
-    let contentToProcess = htmlContent;
-    const cdataMatch = htmlContent.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-    if (cdataMatch) {
-        contentToProcess = cdataMatch[1];
-        console.log('Extracted CDATA content');
-    }
-    
-    // Decode HTML entities
-    const decodedContent = contentToProcess
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'");
-    
-    // Remove HTML tags but keep the text content
-    const textContent = decodedContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-    
-    console.log('Text content to search (first 1000 chars):', textContent.substring(0, 1000));
-    
-    // Extended list of compliance topics to look for
-    const topics = [
-        'Terms of Service',
-        'Privacy Policy',
-        'Data Processing Agreement',
-        'Cookie Policy',
-        'GDPR Compliance',
-        'CCPA Compliance',
-        'SOC 2',
-        'ISO 27001',
-        'Encryption at Rest',
-        'Encryption in Transit',
-        'Access Controls',
-        'Penetration Testing',
-        'Business Registration',
-        'Tax Compliance',
-        'Trademark Registration',
-        'Patent Filing',
-        'Employee Handbook',
-        'Background Checks',
-        'Benefits Compliance',
-        'User Agreement',
-        'Acceptable Use Policy',
-        'Security Policy'
-    ];
-    
-    topics.forEach(topic => {
-        // Check if the topic appears in the content (case insensitive)
-        const topicRegex = new RegExp(topic, 'i');
-        if (topicRegex.test(textContent)) {
-            // Look for status indicators near the topic (within ~200 characters)
-            const contextRegex = new RegExp(`${topic}.{0,200}(COMPLETE|IN[_\\s-]?PROGRESS|PENDING|TODO|DONE)`, 'i');
-            const match = textContent.match(contextRegex);
-            
-            let status = 'PENDING';
-            let checked = false;
-            
-            if (match) {
-                const statusText = match[1].toUpperCase().replace(/[\s_-]/g, '_');
-                console.log(`Found ${topic}: ${statusText}`);
-                
-                if (statusText.includes('COMPLETE') || statusText.includes('DONE')) {
-                    status = 'COMPLETE';
-                    checked = true;
-                } else if (statusText.includes('PROGRESS')) {
-                    status = 'IN_PROGRESS';
-                    checked = false;
-                } else {
-                    status = 'PENDING';
-                    checked = false;
-                }
-            }
-            
-            items.push({
-                name: topic,
-                status: status,
-                checked: checked
-            });
+// Use Gemini AI to analyze compliance documents
+async function analyzeWithGemini(documentContent) {
+    try {
+        // Extract text from CDATA if present
+        let content = documentContent;
+        const cdataMatch = documentContent.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+        if (cdataMatch) {
+            content = cdataMatch[1];
         }
-    });
-    
-    // If no items found, return a default message
-    if (items.length === 0) {
-        items.push({
-            name: 'No compliance items detected',
+        
+        // Remove HTML tags
+        const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        
+        console.log('Sending to Gemini, content length:', textContent.length);
+        
+        const prompt = `You are an expert legal compliance analyst. Analyze this compliance document and extract all compliance items with their status.
+
+Document:
+${textContent}
+
+Return ONLY a JSON array of compliance items (no markdown, no explanation). Each item should have:
+- name: The compliance topic (e.g., "Terms of Service", "GDPR Compliance")
+- status: "COMPLETE", "IN_PROGRESS", or "PENDING"
+- checked: true if complete, false otherwise
+
+Example format: [{"name":"Terms of Service","status":"COMPLETE","checked":true}]`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: prompt
+                    }]
+                }],
+                generationConfig: {
+                    temperature: 0.3,
+                    maxOutputTokens: 2000
+                }
+            })
+        });
+        
+        console.log('Gemini response status:', response.status);
+        const responseText = await response.text();
+        console.log('Gemini raw response:', responseText.substring(0, 500));
+        
+        if (!response.ok) {
+            throw new Error(`Gemini API error: ${response.status} - ${responseText}`);
+        }
+        
+        const data = JSON.parse(responseText);
+        
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+            throw new Error('Invalid Gemini response structure');
+        }
+        
+        const aiResponse = data.candidates[0].content.parts[0].text.trim();
+        console.log('AI response content:', aiResponse);
+        
+        // Parse the JSON response
+        // Remove markdown code blocks if present
+        let jsonStr = aiResponse;
+        const jsonMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+            jsonStr = jsonMatch[1].trim();
+        }
+        
+        const items = JSON.parse(jsonStr);
+        
+        // Validate and format the items
+        if (!Array.isArray(items)) {
+            throw new Error('AI did not return an array');
+        }
+        
+        return items.map(item => ({
+            name: item.name || 'Unknown',
+            status: item.status || 'PENDING',
+            checked: item.checked || false
+        }));
+        
+    } catch (error) {
+        console.error('Error in Gemini analysis:', error);
+        // Fallback to a simple message
+        return [{
+            name: 'AI Analysis Failed: ' + error.message,
             status: 'INFO',
             checked: false
-        });
+        }];
     }
-    
-    return items;
 }
 
 // Save Confluence link to storage

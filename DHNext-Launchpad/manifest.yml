@@ -27,3 +27,7 @@ permissions:
     - read:confluence-props
     - read:confluence-content.summary
     - read:page:confluence
+  external:
+    fetch:
+      backend:
+        - 'generativelanguage.googleapis.com'
