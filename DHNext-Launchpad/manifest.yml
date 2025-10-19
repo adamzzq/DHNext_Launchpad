@@ -22,3 +22,12 @@ app:
 permissions:
   scopes:
     - storage:app
+    - read:confluence-content.all
+    - read:confluence-space.summary
+    - read:confluence-props
+    - read:confluence-content.summary
+    - read:page:confluence
+  external:
+    fetch:
+      backend:
+        - 'generativelanguage.googleapis.com'

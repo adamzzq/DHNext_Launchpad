@@ -5,32 +5,32 @@ import { invoke } from '@forge/bridge';
 const App = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [complianceResult, setComplianceResult] = useState(null);
+    const [compliancePageUrl, setCompliancePageUrl] = useState('');
     const [confluenceLink, setConfluenceLink] = useState('');
     const [savedLink, setSavedLink] = useState('');
     
     const runComplianceCheck = async () => {
-        console.log('Compliance check button clicked!');
+        if (!compliancePageUrl.trim()) {
+            console.log('Please enter a Confluence page URL');
+            return;
+        }
+        
+        console.log('Compliance check button clicked for:', compliancePageUrl);
         setIsLoading(true);
         
-        // Fake Rovo response data
-        const fakeResponse = {
-            status: 'success',
-            items: [
-                { name: 'Terms of Service', status: 'COMPLETE', checked: true },
-                { name: 'Privacy Policy', status: 'COMPLETE', checked: true },
-                { name: 'Data Processing Agreement', status: 'COMPLETE', checked: true },
-                { name: 'Cookie Policy', status: 'IN_PROGRESS', checked: false }
-            ],
-            timestamp: new Date().toISOString()
-        };
-        
         try {
-            // Call the backend resolver
-            const result = await invoke('runComplianceCheck', { fakeResponse });
+            // Call the backend to read and parse the Confluence page
+            const result = await invoke('runComplianceCheck', { 
+                confluencePageUrl: compliancePageUrl 
+            });
             console.log('Backend returned:', result);
             setComplianceResult(result);
         } catch (error) {
             console.error('Error calling backend:', error);
+            setComplianceResult({
+                status: 'error',
+                message: error.message || 'Failed to read Confluence page'
+            });
         } finally {
             setIsLoading(false);
         }
@@ -55,14 +55,37 @@ const App = () => {
             
             {/* Feature 1: Legal & Compliance Checker */}
             <Strong>🔍 Legal & Compliance Checker</Strong>
-            <Text>Verify startup compliance requirements</Text>
+            <Text>Verify startup compliance requirements from Confluence</Text>
+            <Textfield
+                name="compliancePageUrl"
+                label="Confluence Page URL"
+                placeholder="Enter Confluence page URL with compliance checklist..."
+                onChange={(value) => {
+                    console.log('Textfield onChange received:', typeof value, value);
+                    // Forge Textfield might pass an event object, extract the value
+                    const actualValue = typeof value === 'object' && value !== null 
+                        ? (value.target?.value || value.value || '') 
+                        : (value || '');
+                    console.log('Setting compliancePageUrl to:', actualValue);
+                    setCompliancePageUrl(actualValue);
+                }}
+                defaultValue=""
+            />
             <Button 
-                text={isLoading ? 'Running Check...' : 'Run Compliance Check'}
+                text={isLoading ? 'Reading Page...' : 'Run Compliance Check'}
                 onClick={runComplianceCheck}
                 isDisabled={isLoading}
             />
             
-            {complianceResult && (
+            {complianceResult && complianceResult.status === 'error' && (
+                <>
+                    <Text> </Text>
+                    <Strong>❌ Error:</Strong>
+                    <Text>{complianceResult.message}</Text>
+                </>
+            )}
+            
+            {complianceResult && complianceResult.status === 'success' && (
                 <>
                     <Text> </Text>
                     <Strong>Compliance Status:</Strong>
@@ -72,6 +95,7 @@ const App = () => {
                         </Text>
                     ))}
                     <Text>Last checked: {new Date(complianceResult.timestamp).toLocaleString()}</Text>
+                    <Text>Source: {complianceResult.pageTitle || 'Confluence Page'}</Text>
                 </>
             )}
             
@@ -84,10 +108,15 @@ const App = () => {
             <Text>Track customer feedback in Confluence</Text>
             <Textfield
                 name="confluenceLink"
-                label="Confluence Page URL"
-                placeholder="Paste Confluence URL here..."
-                value={confluenceLink}
-                onChange={(value) => setConfluenceLink(value)}
+                label="Confluence Link"
+                placeholder="Enter Confluence page URL..."
+                onChange={(value) => {
+                    const actualValue = typeof value === 'object' && value !== null 
+                        ? (value.target?.value || value.value || '') 
+                        : (value || '');
+                    setConfluenceLink(actualValue);
+                }}
+                defaultValue=""
             />
             <Button 
                 text="Save Link"
