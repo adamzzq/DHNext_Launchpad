@@ -10,7 +10,8 @@ import ForgeReconciler, {
     SectionMessage,
     Lozenge,
     Inline,
-    xcss
+    xcss,
+    ButtonGroup
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
 
@@ -20,6 +21,8 @@ const App = () => {
     const [compliancePageUrl, setCompliancePageUrl] = useState('');
     const [confluenceLink, setConfluenceLink] = useState('');
     const [savedLink, setSavedLink] = useState('');
+    const [collapsedCategories, setCollapsedCategories] = useState({});
+    const [viewType, setViewType] = useState('category'); // 'category', 'status', or 'original'
     
     const runComplianceCheck = async () => {
         if (!compliancePageUrl.trim()) {
@@ -73,6 +76,144 @@ const App = () => {
         }
     };
     
+    const getStatusBadgeStyle = (status) => {
+        switch (status) {
+            case 'COMPLETE':
+                return {
+                    backgroundColor: 'color.background.success.bold',
+                    color: 'color.text.inverse',
+                    padding: 'space.075',
+                    paddingInline: 'space.150',
+                    borderRadius: 'border.radius',
+                    display: 'inline-block'
+                };
+            case 'IN_PROGRESS':
+                return {
+                    backgroundColor: 'color.background.information.bold',
+                    color: 'color.text.inverse',
+                    padding: 'space.075',
+                    paddingInline: 'space.150',
+                    borderRadius: 'border.radius',
+                    display: 'inline-block'
+                };
+            case 'PENDING':
+                return {
+                    backgroundColor: 'color.background.warning.bold',
+                    color: 'color.text.inverse',
+                    padding: 'space.075',
+                    paddingInline: 'space.150',
+                    borderRadius: 'border.radius',
+                    display: 'inline-block'
+                };
+            default:
+                return {
+                    backgroundColor: 'color.background.neutral.bold',
+                    color: 'color.text.inverse',
+                    padding: 'space.075',
+                    paddingInline: 'space.150',
+                    borderRadius: 'border.radius',
+                    display: 'inline-block'
+                };
+        }
+    };
+    
+    const groupItemsByCategory = (items) => {
+        if (!items) return {};
+        
+        const categorized = {};
+        items.forEach(item => {
+            // Extract category from item name or use a default
+            let category = 'General Compliance';
+            
+            // Common legal/compliance categories
+            if (item.name.toLowerCase().includes('privacy') || item.name.toLowerCase().includes('gdpr') || item.name.toLowerCase().includes('data')) {
+                category = 'Privacy & Data Protection';
+            } else if (item.name.toLowerCase().includes('terms') || item.name.toLowerCase().includes('service') || item.name.toLowerCase().includes('agreement')) {
+                category = 'Terms & Agreements';
+            } else if (item.name.toLowerCase().includes('security') || item.name.toLowerCase().includes('encryption')) {
+                category = 'Security & Infrastructure';
+            } else if (item.name.toLowerCase().includes('legal') || item.name.toLowerCase().includes('license') || item.name.toLowerCase().includes('intellectual')) {
+                category = 'Legal & Licensing';
+            } else if (item.name.toLowerCase().includes('accessibility') || item.name.toLowerCase().includes('ada') || item.name.toLowerCase().includes('wcag')) {
+                category = 'Accessibility';
+            } else if (item.name.toLowerCase().includes('cookie') || item.name.toLowerCase().includes('tracking')) {
+                category = 'Cookies & Tracking';
+            }
+            
+            if (!categorized[category]) {
+                categorized[category] = [];
+            }
+            categorized[category].push(item);
+        });
+        
+        return categorized;
+    };
+    
+    const toggleCategory = (category) => {
+        setCollapsedCategories(prev => ({
+            ...prev,
+            [category]: !prev[category]
+        }));
+    };
+    
+    const groupItemsByStatus = (items) => {
+        if (!items) return {};
+        
+        const grouped = {
+            'COMPLETE': [],
+            'IN_PROGRESS': [],
+            'PENDING': []
+        };
+        
+        items.forEach(item => {
+            if (grouped[item.status]) {
+                grouped[item.status].push(item);
+            } else {
+                grouped['PENDING'].push(item);
+            }
+        });
+        
+        return grouped;
+    };
+    
+    const renderItemGrid = (items) => {
+        return (
+            <Box xcss={xcss({ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 'space.150'
+            })}>
+                {items.map((item, index) => (
+                    <Box 
+                        key={index} 
+                        xcss={xcss({ 
+                            padding: 'space.200', 
+                            backgroundColor: 'elevation.surface.raised',
+                            borderRadius: 'border.radius',
+                            borderLeft: '4px solid',
+                            borderColor: item.checked ? 'color.border.success' : 'color.border.warning',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            ':hover': {
+                                backgroundColor: 'elevation.surface.hovered',
+                                transform: 'translateY(-2px)',
+                                boxShadow: 'elevation.shadow.overlay'
+                            }
+                        })}
+                    >
+                        <Stack space="space.100">
+                            <Text>{item.checked ? '✅' : '⏳'}</Text>
+                            <Text><Strong>{item.name}</Strong></Text>
+                            <Box xcss={xcss(getStatusBadgeStyle(item.status))}>
+                                <Text>{item.status}</Text>
+                            </Box>
+                        </Stack>
+                    </Box>
+                ))}
+            </Box>
+        );
+    };
+    
     return (
         <Box xcss={xcss({ padding: 'space.300' })}>
             <Stack space="space.400">
@@ -107,11 +248,12 @@ const App = () => {
                             />
                             
                             <Button 
-                                text={isLoading ? '⏳ Analyzing Document...' : '🔍 Run Compliance Check'}
                                 onClick={runComplianceCheck}
                                 isDisabled={isLoading}
                                 appearance="primary"
-                            />
+                            >
+                                {isLoading ? '⏳ Analyzing Document...' : '🔍 Run Compliance Check'}
+                            </Button>
                         </Stack>
                         
                         {complianceResult && complianceResult.status === 'error' && (
@@ -125,6 +267,31 @@ const App = () => {
                                 <Stack space="space.300">
                                     <Stack space="space.100">
                                         <Heading size="small">Compliance Results</Heading>
+                                        <Box xcss={xcss({ paddingBlock: 'space.100' })}>
+                                            <Stack space="space.100">
+                                                <Text><Strong>View by:</Strong></Text>
+                                                <ButtonGroup>
+                                                    <Button 
+                                                        onClick={() => setViewType('category')}
+                                                        appearance={viewType === 'category' ? 'primary' : 'default'}
+                                                    >
+                                                        📁 Category
+                                                    </Button>
+                                                    <Button 
+                                                        onClick={() => setViewType('status')}
+                                                        appearance={viewType === 'status' ? 'primary' : 'default'}
+                                                    >
+                                                        📊 Status
+                                                    </Button>
+                                                    <Button 
+                                                        onClick={() => setViewType('original')}
+                                                        appearance={viewType === 'original' ? 'primary' : 'default'}
+                                                    >
+                                                        📄 Original
+                                                    </Button>
+                                                </ButtonGroup>
+                                            </Stack>
+                                        </Box>
                                         <Text>
                                             <Strong>Source:</Strong> {complianceResult.pageTitle || 'Confluence Page'}
                                         </Text>
@@ -133,40 +300,82 @@ const App = () => {
                                         </Text>
                                     </Stack>
                                     
-                                    {/* 3-column grid layout */}
-                                    <Box xcss={xcss({ 
-                                        display: 'grid', 
-                                        gridTemplateColumns: 'repeat(3, 1fr)',
-                                        gap: 'space.150'
-                                    })}>
-                                        {complianceResult.items && complianceResult.items.map((item, index) => (
-                                            <Box 
-                                                key={index} 
-                                                xcss={xcss({ 
-                                                    padding: 'space.200', 
-                                                    backgroundColor: 'elevation.surface.raised',
-                                                    borderRadius: 'border.radius',
-                                                    borderLeft: '4px solid',
-                                                    borderColor: item.checked ? 'color.border.success' : 'color.border.warning',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s ease',
-                                                    ':hover': {
-                                                        backgroundColor: 'elevation.surface.hovered',
-                                                        transform: 'translateY(-2px)',
-                                                        boxShadow: 'elevation.shadow.overlay'
-                                                    }
-                                                })}
-                                            >
-                                                <Stack space="space.100">
-                                                    <Text>{item.checked ? '✅' : '⏳'}</Text>
-                                                    <Text><Strong>{item.name}</Strong></Text>
-                                                    <Lozenge appearance={getLozengeAppearance(item.status)}>
-                                                        {item.status}
-                                                    </Lozenge>
-                                                </Stack>
-                                            </Box>
-                                        ))}
-                                    </Box>
+                                    {/* Category View */}
+                                    {viewType === 'category' && (
+                                        <Stack space="space.200">
+                                            {Object.entries(groupItemsByCategory(complianceResult.items)).map(([category, items]) => {
+                                                const isCollapsed = collapsedCategories[category];
+                                                const completedCount = items.filter(item => item.checked).length;
+                                                
+                                                return (
+                                                    <Box key={category}>
+                                                        <Stack space="space.150">
+                                                            {/* Category Header - Clickable to Collapse/Expand */}
+                                                            <Box xcss={xcss({ 
+                                                                padding: 'space.150',
+                                                                backgroundColor: 'elevation.surface.raised',
+                                                                borderRadius: 'border.radius'
+                                                            })}>
+                                                                <Inline space="space.100" alignBlock="center">
+                                                                    <Button
+                                                                        onClick={() => toggleCategory(category)}
+                                                                        appearance="subtle"
+                                                                    >
+                                                                        {isCollapsed ? '▶' : '▼'}
+                                                                    </Button>
+                                                                    <Heading size="small">{category}</Heading>
+                                                                    <Text>({completedCount}/{items.length} complete)</Text>
+                                                                </Inline>
+                                                            </Box>
+                                                            
+                                                            {/* Category Items - Collapsible */}
+                                                            {!isCollapsed && renderItemGrid(items)}
+                                                        </Stack>
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Stack>
+                                    )}
+                                    
+                                    {/* Status View */}
+                                    {viewType === 'status' && (
+                                        <Stack space="space.200">
+                                            {Object.entries(groupItemsByStatus(complianceResult.items)).map(([status, items]) => {
+                                                if (items.length === 0) return null;
+                                                const isCollapsed = collapsedCategories[status];
+                                                
+                                                return (
+                                                    <Box key={status}>
+                                                        <Stack space="space.150">
+                                                            {/* Status Header - Clickable to Collapse/Expand */}
+                                                            <Box xcss={xcss({ 
+                                                                padding: 'space.150',
+                                                                backgroundColor: 'elevation.surface.raised',
+                                                                borderRadius: 'border.radius'
+                                                            })}>
+                                                                <Inline space="space.100" alignBlock="center">
+                                                                    <Button
+                                                                        onClick={() => toggleCategory(status)}
+                                                                        appearance="subtle"
+                                                                    >
+                                                                        {isCollapsed ? '▶' : '▼'}
+                                                                    </Button>
+                                                                    <Heading size="small">{status}</Heading>
+                                                                    <Text>({items.length} items)</Text>
+                                                                </Inline>
+                                                            </Box>
+                                                            
+                                                            {/* Status Items - Collapsible */}
+                                                            {!isCollapsed && renderItemGrid(items)}
+                                                        </Stack>
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Stack>
+                                    )}
+                                    
+                                    {/* Original Order View */}
+                                    {viewType === 'original' && renderItemGrid(complianceResult.items)}
                                 </Stack>
                             </Box>
                         )}
@@ -196,10 +405,11 @@ const App = () => {
                             />
                             
                             <Button 
-                                text="💾 Save Feedback Link"
                                 onClick={saveLink}
                                 appearance="primary"
-                            />
+                            >
+                                💾 Save Feedback Link
+                            </Button>
                         </Stack>
                         
                         {savedLink && (
